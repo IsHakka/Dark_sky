@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>meteor shower練習</title>
+    <style>
+        * {
+            padding: 0;
+            margin: 0;
+        }
+
+        body {
+            width: 100%;
+            height: 100vh;
+            background-image: linear-gradient(-225deg, #08070a 0%,
+                    #09090b 29%, #000000 100%);
+        }
+
+        canvas {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas></canvas>
+
+</body>
+<script>
+
+    // 星星顏色
+    const STAR_COLOR = '#fff';
+    const STAR_SIZE = 3;
+    const STAR_MIN_SCALE = 0.2;
+    const OVERFLOW_THRESHOLD = 50;
+    // 星星數量
+    const STAR_COUNT = (window.innerWidth + window.innerHeight) / 8;
+    // canvas元素
+    const canvas = document.querySelector('canvas');
+    // canvas的繪圖上下文
+    const context = canvas.getContext('2d');
+    // 縮放比例
+    let scale = 1; // device pixel ratio
+    // 寬度、高度
+    let width;
+    let height;
+    // 星星陣列
+    let stars = [];
+    // 抓鼠標
+    let pointerX;
+    let pointerY;
+    // 速度
+    let velocity = { x: 0, y: 0, tx: 0, ty: 0, z: 0.0009 };
+    let touchInput = false;
+    // 生成星星
+    generate();
+    // 調整大小
+    resize();
+    // 運行畫面
+    step();
+
+
+    // 當窗口大小改變時，重新調整大小
+    window.onresize = resize;
+    // 当鼠標在canvas上移動時，更新鼠標移動位置
+    canvas.onmousemove = onMouseMove;
+    // 當觸摸屏在canvas上移動時，更新鼠標位置
+    canvas.ontouchmove = onTouchMove;
+    // 當觸摸屏離開canvas上移動時，更新鼠標指针位置
+    canvas.ontouchend = onMouseLeave;
+    // 當鼠標離開文檔時，更新鼠標指针位置
+    document.onmouseleave = onMouseLeave;
+    // 生成星星
+    function generate() {
+        for (let i = 0; i < STAR_COUNT; i++) {
+            stars.push({
+                x: 0,
+                y: 0,
+                z: STAR_MIN_SCALE + Math.random() * (1 - STAR_MIN_SCALE),
+            });
+        }
+    }
+   // 將星星放置到隨機位置
+    function placeStar(star) {
+        star.x = Math.random() * width;
+        star.y = Math.random() * height;
+    }
+    // 回收星星并重新放置到新的位置
+    function recycleStar(star) {
+    // 初始化方向為'z'
+        let direction = 'z';
+    // 取得速度的絕對值
+        let vx = Math.abs(velocity.x);
+        let vy = Math.abs(velocity.y);
+// 如果速度的絕對值大於1，則根據速度的大小隨機決定方向
+        if (vx > 1 || vy > 1) {
+            let axis;
+       // 如果水平速度>垂直速度，則根據水平速度的比例隨機確定水平或垂直方向
+            if (vx > vy) {
+                axis = Math.random() < vx / (vx + vy) ? 'h' : 'v';
+            } else {
+                axis = Math.random() < vy / (vx + vy) ? 'v' : 'h';
+            }
+           // 根據方向確定具體的移動方向
+            if (axis === 'h') {
+                direction = velocity.x > 0 ? 'l' : 'r';
+            } else {
+                direction = velocity.y > 0 ? 't' : 'b';
+            }
+        }
+        // 隨機設定星星的縮放比例
+        star.z = STAR_MIN_SCALE + Math.random() * (1 - STAR_MIN_SCALE);
+        // 根据方向设置星星的位置
+        if (direction === 'z') {
+           // 如果方向為 'z'，則將星星放置在螢幕中心
+            star.z = 0.1;
+            star.x = Math.random() * width;
+            star.y = Math.random() * height;
+        } else if (direction === 'l') {
+            // 如果方向為 'l'，則將星星放置在螢幕左側
+            star.x = -OVERFLOW_THRESHOLD;
+            star.y = height * Math.random();
+        } else if (direction === 'r') {
+           // 如果方向為 'r'，則將星星放置在螢幕右側
+            star.x = width + OVERFLOW_THRESHOLD;
+            star.y = height * Math.random();
+        } else if (direction === 't') {
+            // 如果方向為 't'，則將星星放置在螢幕頂部
+            star.x = width * Math.random();
+            star.y = -OVERFLOW_THRESHOLD;
+        } else if (direction === 'b') {
+           // 如果方向為 'b'，則將星星放置在螢幕底部
+            star.x = width * Math.random();
+            star.y = height + OVERFLOW_THRESHOLD;
+        }
+    }
+    // 調整大小
+    function resize() {
+      // 取得裝置像素比例
+        scale = window.devicePixelRatio || 1;
+      // 設定畫布的寬度和高度
+        width = window.innerWidth * scale;
+        height = window.innerHeight * scale;
+        canvas.width = width;
+        canvas.height = height;
+      // 將所有星星重新放置到螢幕上
+        stars.forEach(placeStar);
+    }
+   // 動畫的每一幀
+    function step() {
+        // 清空畫布
+        context.clearRect(0, 0, width, height);
+        // 更新星星的位置和速度
+        update();
+        // 繪製星星
+        render();
+       // 請求下一幀動畫
+        requestAnimationFrame(step);
+    }
+    // 更新星星的位置和速度
+    function update() {
+        // 緩動速度
+        velocity.tx *= 0.96;
+        velocity.ty *= 0.96;
+        // 更新速度
+        velocity.x += (velocity.tx - velocity.x) * 0.8;
+        velocity.y += (velocity.ty - velocity.y) * 0.8;
+       // 遍歷所有星星
+        stars.forEach((star) => {
+           // 根據速度和縮放比例更新星星的位置
+            star.x += velocity.x * star.z;
+            star.y += velocity.y * star.z;
+            // 根據速度和縮放比例更新星星的位置（使星星圍繞螢幕中心旋轉）
+            star.x += (star.x - width / 2) * velocity.z * star.z;
+            star.y += (star.y - height / 2) * velocity.z * star.z;
+            // 更新星星的縮放比例
+            star.z += velocity.z;
+            // 如果星星超出螢幕範圍，則重新放置到螢幕上
+            if (
+                star.x < -OVERFLOW_THRESHOLD ||
+                star.x > width + OVERFLOW_THRESHOLD ||
+                star.y < -OVERFLOW_THRESHOLD ||
+                star.y > height + OVERFLOW_THRESHOLD
+            ) {
+                recycleStar(star);
+            }
+        });
+    }
+   // 繪製星星
+    function render() {
+        // 遍歷所有星星
+        stars.forEach((star) => {
+            // 設定繪製星星的樣式
+            context.beginPath();
+            context.lineCap = 'round';
+            context.lineWidth = STAR_SIZE * star.z * scale;
+            context.globalAlpha = 0.5 + 0.5 * Math.random();
+            context.strokeStyle = STAR_COLOR;
+            // 繪製星星的路徑
+            context.beginPath();
+            context.moveTo(star.x, star.y);
+           // 計算星星的尾巴座標
+            let tailX = velocity.x * 2;
+            let tailY = velocity.y * 2;
+            // 如果尾巴座標的絕對值小於0.1，則設定為0.5
+            if (Math.abs(tailX) < 0.1) tailX = 0.5;
+            if (Math.abs(tailY) < 0.1) tailY = 0.5;
+            // 繪製星星的尾巴
+            context.lineTo(star.x + tailX, star.y + tailY);
+            context.stroke();
+        });
+    }
+    // 移動滑鼠指標
+    function movePointer(x, y) {
+       // 如果之前有記錄滑鼠指標的位置，則計算滑鼠指標的移動距離，並更新速度
+        if (typeof pointerX === 'number' && typeof pointerY === 'number') {
+            let ox = x - pointerX;
+            let oy = y - pointerY;
+            velocity.tx = velocity.tx + (ox / 8) * scale * (touchInput ? 1 : -1);
+            velocity.ty = velocity.ty + (oy / 8) * scale * (touchInput ? 1 : -1);
+        }
+       // 更新滑鼠指標的位置
+        pointerX = x;
+        pointerY = y;
+    }
+    // 當滑鼠在canvas上移動時的事件處理函數
+    function onMouseMove(event) {
+        touchInput = false;
+        movePointer(event.clientX, event.clientY);
+    }
+    // 當觸控螢幕在canvas上移動時的事件處理函數
+    function onTouchMove(event) {
+        touchInput = true;
+        movePointer(event.touches[0].clientX, event.touches[0].clientY, true);
+        event.preventDefault();
+    }
+    // 当鼠標离开canvas時的事件處理函數
+    function onMouseLeave() {
+        pointerX = null;
+        pointerY = null;
+    }
+</script>
+
+</html>
